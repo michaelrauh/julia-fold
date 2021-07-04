@@ -42,13 +42,22 @@ function get_all(f :: Function, l :: Vector{Vector{String}}) :: Dict{String, Set
     mergewith(union, map(f, l)...)
 end
 
-function prevs(l :: Vector{String}) :: Dict{String, Set{String}}
+function if_longer_two_then(f :: Function, l :: Vector{String})
     if length(l) < 2
         Dict()
     else
-        mergewith(union, Dict(l[2]=>Set([first(l)])), get_prevs(l[2:end]))
+        f(l)
     end
+end
+
+function prevs(l :: Vector{String}) :: Dict{String, Set{String}}
+    if_longer_two_then(x -> mergewith(union, Dict(x[2]=>Set([first(x)])), prevs(x[2:end])), l)
+end
+
+function nexts(l :: Vector{String}) :: Dict{String, Set{String}}
+    iflongertwoThen(x -> mergewith(union, Dict(first(x)=>Set([x[2]])), nexts(x[2:end])), l)
 end
 
 get_all(prevs, [["a", "b", "c"], ["d", "e", "f"], ["e", "b"]])
 get_all(prevs, read_file_to_arrays("example1.txt"))
+get_all(nexts, read_file_to_arrays("example1.txt"))
