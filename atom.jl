@@ -27,3 +27,13 @@ next = Dict{String,Set{String}}("a" => Set(["b", "c"]), "b" => Set(["d"]), "c" =
 prev = Dict{String,Set{String}}("b" => Set(["a"]), "c" => Set(["a", "d"]), "d" => Set(["b", "c"]))
 
 make_atom("d", next, prev)
+
+function read_file_to_arrays(filename :: String) :: Vector{Vector{String}}
+    open(filename) do f
+        map(split(read(f, String), ".")) do y
+            y |> split |> x -> join(x, " ") |> x -> replace(x, r"[^a-zA-Z0-9_\ ]" => "") |> lowercase |> split
+        end
+    end
+end
+
+read_file_to_arrays("example1.txt")
