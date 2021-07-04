@@ -55,7 +55,7 @@ function prevs(l :: Vector{String}) :: Dict{String, Set{String}}
 end
 
 function nexts(l :: Vector{String}) :: Dict{String, Set{String}}
-    iflongertwoThen(x -> mergewith(union, Dict(first(x)=>Set([x[2]])), nexts(x[2:end])), l)
+    if_longer_two_then(x -> mergewith(union, Dict(first(x)=>Set([x[2]])), nexts(x[2:end])), l)
 end
 
 get_all(prevs, [["a", "b", "c"], ["d", "e", "f"], ["e", "b"]])
