@@ -38,11 +38,11 @@ end
 
 read_file_to_arrays("example1.txt")
 
-function get_all_prevs(l :: Vector{Vector{String}}) :: Dict{String, Set{String}}
-    mergewith(union, map(get_prevs, l)...)
+function get_all(f :: Function, l :: Vector{Vector{String}}) :: Dict{String, Set{String}}
+    mergewith(union, map(f, l)...)
 end
 
-function get_prevs(l :: Vector{String}) :: Dict{String, Set{String}}
+function prevs(l :: Vector{String}) :: Dict{String, Set{String}}
     if length(l) < 2
         Dict()
     else
@@ -50,4 +50,5 @@ function get_prevs(l :: Vector{String}) :: Dict{String, Set{String}}
     end
 end
 
-get_all_prevs([["a", "b", "c"], ["d", "e", "f"], ["e", "b"]])
+get_all(prevs, [["a", "b", "c"], ["d", "e", "f"], ["e", "b"]])
+get_all(prevs, read_file_to_arrays("example1.txt"))
