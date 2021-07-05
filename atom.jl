@@ -1,3 +1,18 @@
+struct Ortho
+    data
+    lhs_center
+    rhs_center
+    diagonals
+end
+
+function make_ortho(a, b, c, d) :: Ortho
+    data = [a b; c d]
+    lhs_center = [a; c]
+    rhs_center = [b; d]
+    diagonals = [Set([a]), Set([b, c]), Set([(d)])]
+    Ortho(data, lhs_center, rhs_center, diagonals)
+end
+
 """
 a b
 c d
@@ -6,7 +21,7 @@ function make_atom(
     word::String,
     next::Dict{String,Set{String}},
     prev::Dict{String,Set{String}},
-)::Set{Tuple{String,String,String,String}}
+)::Set{Ortho}
     ans = Set()
     d = word
     for c in get(prev, d, Set())
@@ -14,7 +29,7 @@ function make_atom(
             for b in get(next, a, Set())
                 for d_prime in get(next, b, Set())
                     if d == d_prime && b != c
-                        push!(ans, (a, b, c, d))
+                        push!(ans, make_ortho(a, b, c, d))
                     end
                 end
             end
@@ -23,11 +38,6 @@ function make_atom(
     return ans
 end
 
-next = Dict{String,Set{String}}("a" => Set(["b", "c"]), "b" => Set(["d"]), "c" => Set(["d"]))
-prev = Dict{String,Set{String}}("b" => Set(["a"]), "c" => Set(["a", "d"]), "d" => Set(["b", "c"]))
-
-make_atom("d", next, prev)
-
 function read_file_to_arrays(filename::String)::Vector{Vector{String}}
     open(filename) do f
         map(split(read(f, String), ".")) do y
@@ -35,8 +45,6 @@ function read_file_to_arrays(filename::String)::Vector{Vector{String}}
         end
     end
 end
-
-read_file_to_arrays("example1.txt")
 
 function get_all(f::Function, l::Vector{Vector{String}})::Dict{String,Set{String}}
     mergewith(union, map(f, l)...)
@@ -58,9 +66,10 @@ function nexts(l::Vector{String})::Dict{String,Set{String}}
     if_longer_two_then(x -> mergewith(union, Dict(first(x) => Set([x[2]])), nexts(x[2:end])), l)
 end
 
-all_prevs = get_all(prevs, read_file_to_arrays("example1.txt"))
-all_nexts = get_all(nexts, read_file_to_arrays("example1.txt"))
+file_arrays = read_file_to_arrays("example1.txt")
+all_prevs = get_all(prevs, file_arrays)
+all_nexts = get_all(nexts, file_arrays)
 
-vocab = unique(sort(vcat(read_file_to_arrays("example1.txt")...)))
+vocab = vcat(file_arrays...) |> sort |> unique
 
 filter(!isempty, vocab .|> x -> make_atom(x, all_nexts, all_prevs))
