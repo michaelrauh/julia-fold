@@ -8,7 +8,7 @@ end
 struct State
     lhs_center_to_ortho::Dict{Array{String},Set{Ortho}}
     rhs_center_to_ortho::Dict{Array{String},Set{Ortho}}
-    boxes::Dict{Any, Set{Ortho}}
+    boxes::Dict{Any,Set{Ortho}}
     increment::Set{Ortho}
 end
 
@@ -82,22 +82,34 @@ function tails(sentence)
     end
 end
 
-function ingest_word(state::State, next::Dict{String,Set{String}}, prev::Dict{String,Set{String}}, word::String)::State
-    known_boxes = get(state.boxes, (2, 2), Set())
-    new_boxes = make_atom(word, next, prev)
+function update_state_values(state, known_boxes, new_boxes, box_update_key)
     increment = filter(!(x -> x in known_boxes), new_boxes)
-    lhs_center_to_ortho = mergewith(union, state.lhs_center_to_ortho, map(x -> Dict(getfield(x, :lhs_center) => Set([x])), collect(increment))...)
+    lhs_center_to_ortho = mergewith(
+        union,
+        state.lhs_center_to_ortho,
+        map(x -> Dict(getfield(x, :lhs_center) => Set([x])), collect(increment))...,
+    )
     rhs_center_to_ortho = mergewith(
         union,
         state.rhs_center_to_ortho,
         map(x -> Dict(getfield(x, :rhs_center) => Set([x])), collect(increment))...,
     )
-    boxes = mergewith(union, state.boxes, Dict((2, 2) => increment))
-    println(typeof(lhs_center_to_ortho))
-    println(typeof(rhs_center_to_ortho))
-    println(typeof(boxes))
-    println(typeof(increment))
+    boxes = mergewith(union, state.boxes, Dict(box_update_key => increment))
     State(lhs_center_to_ortho, rhs_center_to_ortho, boxes, increment)
+end
+
+function ingest_word(state::State, next::Dict{String,Set{String}}, prev::Dict{String,Set{String}}, word::String)::State
+    dims = (2, 2)
+    known_boxes = get(state.boxes, dims, Set())
+    new_boxes = make_atom(word, next, prev)
+    update_state_values(state, known_boxes, new_boxes, dims)
+end
+
+function increase_minor_axis_size(phrases :: Array{Set{String}}, state :: State, current :: Ortho)
+    dims = size(current.data)
+    known_boxes = get(state.boxes, dims, Set())
+    new_boxes = combine_in_axis(phrases, state.lhs_center_to_ortho, state.rhs_center_to_ortho, current)
+    update_state_values(state, known_boxes, new_boxes, bump_last_dim(dims))
 end
 
 function empty_state()
@@ -114,3 +126,5 @@ state = empty_state()
 for word in vocab
     state = ingest_word(state, all_nexts, all_prevs, word)
 end
+
+state
