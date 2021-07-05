@@ -1,22 +1,22 @@
 struct Ortho
-    data
-    lhs_center
-    rhs_center
-    diagonals
+    data::Array{String}
+    lhs_center::Array{String}
+    rhs_center::Array{String}
+    diagonals::Array{Set{String}}
 end
 
 struct State
-    lhs_center_to_ortho
-    rhs_center_to_ortho
-    boxes
-    increment
+    lhs_center_to_ortho::Dict{Array{String},Set{Ortho}}
+    rhs_center_to_ortho::Dict{Array{String},Set{Ortho}}
+    boxes::Dict{Any, Set{Ortho}}
+    increment::Set{Ortho}
 end
 
-function make_ortho(a, b, c, d) :: Ortho
+function make_ortho(a::String, b::String, c::String, d::String)::Ortho
     data = [a b; c d]
     lhs_center = [a; c]
     rhs_center = [b; d]
-    diagonals = [Set([a]), Set([b, c]), Set([(d)])]
+    diagonals = [Set([a]), Set([b, c]), Set([d])]
     Ortho(data, lhs_center, rhs_center, diagonals)
 end
 
@@ -24,11 +24,7 @@ end
 a b
 c d
 d <- c <- a -> b -> d' where d = d', b != c"""
-function make_atom(
-    word::String,
-    next::Dict{String,Set{String}},
-    prev::Dict{String,Set{String}},
-)::Set{Ortho}
+function make_atom(word::String, next::Dict{String,Set{String}}, prev::Dict{String,Set{String}})::Set{Ortho}
     ans = Set()
     d = word
     for c in get(prev, d, Set())
@@ -46,11 +42,12 @@ function make_atom(
 end
 
 function read_file_to_arrays(filename::String)::Vector{Vector{String}}
-    open(filename) do f
+    ans = open(filename) do f
         map(split(read(f, String), ".")) do y
             y |> split |> x -> join(x, " ") |> x -> replace(x, r"[^a-zA-Z0-9_\ ]" => "") |> lowercase |> split
         end
     end
+    filter(x -> !isempty(x), ans)
 end
 
 function get_all(f::Function, l::Vector{Vector{String}})::Dict{String,Set{String}}
@@ -73,38 +70,6 @@ function nexts(l::Vector{String})::Dict{String,Set{String}}
     if_longer_two_then(x -> mergewith(union, Dict(first(x) => Set([x[2]])), nexts(x[2:end])), l)
 end
 
-file_arrays = read_file_to_arrays("example1.txt")
-all_prevs = get_all(prevs, file_arrays)
-all_nexts = get_all(nexts, file_arrays)
-
-vocab = vcat(file_arrays...) |> sort |> unique
-
-some_orthos = filter(!isempty, vocab .|> x -> make_atom(x, all_nexts, all_prevs))
-
-function ingest_word(state, next, prev, word)
-    known_boxes = get(state.boxes, (2, 2), Set())
-    new_boxes = make_atom(word, next, prev)
-    increment = filter(!(x -> x in known_boxes), new_boxes)
-    lhs_center_to_ortho = mergewith(union, state.lhs_center_to_ortho, map(x -> Dict(getfield(x, :lhs_center) => getfield(x, :data)), collect(increment))...)
-    rhs_center_to_ortho = mergewith(union, state.rhs_center_to_ortho, map(x -> Dict(getfield(x, :rhs_center) => getfield(x, :data)), collect(increment))...)
-    boxes = mergewith(union, state.boxes, Dict((2, 2) => increment))
-    State(lhs_center_to_ortho, rhs_center_to_ortho, boxes, increment)
-end
-
-function empty_state()
-    State(Dict(), Dict(), Dict(), Set())
-end
-
-s = empty_state()
-for word in vocab
-    s = ingest_word(s, all_nexts, all_prevs, word)
-end
-#
-# function increase_minor_axis_size(phrases, state, current)
-#     known_boxes = get(state.boxes, size(current.data), Set())
-#     new_boxes = combine_in_axis()
-
-
 function make_phrases(sentences_list)
     union(map(tails, sentences_list)...)
 end
@@ -116,5 +81,36 @@ function tails(sentence)
         union(Set([sentence]), tails(sentence[2:end]))
     end
 end
-sentences = [["d", "e", "f"],["a", "b", "c"]]
-make_phrases(sentences)
+
+function ingest_word(state::State, next::Dict{String,Set{String}}, prev::Dict{String,Set{String}}, word::String)::State
+    known_boxes = get(state.boxes, (2, 2), Set())
+    new_boxes = make_atom(word, next, prev)
+    increment = filter(!(x -> x in known_boxes), new_boxes)
+    lhs_center_to_ortho = mergewith(union, state.lhs_center_to_ortho, map(x -> Dict(getfield(x, :lhs_center) => Set([x])), collect(increment))...)
+    rhs_center_to_ortho = mergewith(
+        union,
+        state.rhs_center_to_ortho,
+        map(x -> Dict(getfield(x, :rhs_center) => Set([x])), collect(increment))...,
+    )
+    boxes = mergewith(union, state.boxes, Dict((2, 2) => increment))
+    println(typeof(lhs_center_to_ortho))
+    println(typeof(rhs_center_to_ortho))
+    println(typeof(boxes))
+    println(typeof(increment))
+    State(lhs_center_to_ortho, rhs_center_to_ortho, boxes, increment)
+end
+
+function empty_state()
+    State(Dict(), Dict(), Dict(), Set())
+end
+
+file_arrays = read_file_to_arrays("example1.txt")
+all_prevs = get_all(prevs, file_arrays)
+all_nexts = get_all(nexts, file_arrays)
+all_phrases = make_phrases(file_arrays)
+vocab = vcat(file_arrays...) |> sort |> unique
+
+state = empty_state()
+for word in vocab
+    state = ingest_word(state, all_nexts, all_prevs, word)
+end
