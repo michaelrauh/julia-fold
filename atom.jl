@@ -82,12 +82,12 @@ vocab = vcat(file_arrays...) |> sort |> unique
 some_orthos = filter(!isempty, vocab .|> x -> make_atom(x, all_nexts, all_prevs))
 
 function ingest_word(state, next, prev, word)
-    known_boxes = get(state.boxes, [2, 2], Set())
+    known_boxes = get(state.boxes, (2, 2), Set())
     new_boxes = make_atom(word, next, prev)
     increment = filter(!(x -> x in known_boxes), new_boxes)
     lhs_center_to_ortho = mergewith(union, state.lhs_center_to_ortho, map(x -> Dict(getfield(x, :lhs_center) => getfield(x, :data)), collect(increment))...)
     rhs_center_to_ortho = mergewith(union, state.rhs_center_to_ortho, map(x -> Dict(getfield(x, :rhs_center) => getfield(x, :data)), collect(increment))...)
-    boxes = mergewith(union, state.boxes, Dict([2, 2] => increment))
+    boxes = mergewith(union, state.boxes, Dict((2, 2) => increment))
     State(lhs_center_to_ortho, rhs_center_to_ortho, boxes, increment)
 end
 
