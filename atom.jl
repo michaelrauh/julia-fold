@@ -5,6 +5,13 @@ struct Ortho
     diagonals
 end
 
+struct State
+    lhs_center_to_ortho
+    rhs_center_to_ortho
+    boxes
+    increment
+end
+
 function make_ortho(a, b, c, d) :: Ortho
     data = [a b; c d]
     lhs_center = [a; c]
@@ -72,4 +79,27 @@ all_nexts = get_all(nexts, file_arrays)
 
 vocab = vcat(file_arrays...) |> sort |> unique
 
-filter(!isempty, vocab .|> x -> make_atom(x, all_nexts, all_prevs))
+some_orthos = filter(!isempty, vocab .|> x -> make_atom(x, all_nexts, all_prevs))
+
+function ingest_word(state, next, prev, word)
+    known_boxes = get(state.boxes, [2, 2], Set())
+    new_boxes = make_atom(word, next, prev)
+    increment = filter(!(x -> x in known_boxes), new_boxes)
+    lhs_center_to_ortho = mergewith(union, state.lhs_center_to_ortho, map(x -> Dict(getfield(x, :lhs_center) => getfield(x, :data)), collect(increment))...)
+    rhs_center_to_ortho = mergewith(union, state.rhs_center_to_ortho, map(x -> Dict(getfield(x, :rhs_center) => getfield(x, :data)), collect(increment))...)
+    boxes = mergewith(union, state.boxes, Dict([2, 2] => increment))
+    State(lhs_center_to_ortho, rhs_center_to_ortho, boxes, increment)
+end
+
+function empty_state()
+    State(Dict(), Dict(), Dict(), Set())
+end
+
+ingest_word(empty_state(), all_nexts, all_prevs, first(vocab))
+
+s = empty_state()
+for word in vocab
+    s = ingest_word(s, all_nexts, all_prevs, word)
+end
+
+s
