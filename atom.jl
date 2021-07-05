@@ -95,11 +95,26 @@ function empty_state()
     State(Dict(), Dict(), Dict(), Set())
 end
 
-ingest_word(empty_state(), all_nexts, all_prevs, first(vocab))
-
 s = empty_state()
 for word in vocab
     s = ingest_word(s, all_nexts, all_prevs, word)
 end
+#
+# function increase_minor_axis_size(phrases, state, current)
+#     known_boxes = get(state.boxes, size(current.data), Set())
+#     new_boxes = combine_in_axis()
 
-s
+
+function make_phrases(sentences_list)
+    union(map(tails, sentences_list)...)
+end
+
+function tails(sentence)
+    if length(sentence) == 1
+        Set([sentence])
+    else
+        union(Set([sentence]), tails(sentence[2:end]))
+    end
+end
+sentences = [["d", "e", "f"],["a", "b", "c"]]
+make_phrases(sentences)
