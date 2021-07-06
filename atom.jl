@@ -1,3 +1,5 @@
+using EllipsisNotation
+
 struct Ortho
     data::Array{String}
     lhs_center::Array{String}
@@ -82,7 +84,7 @@ function tails(sentence)
     end
 end
 
-function update_state_values(state, known_boxes, new_boxes, box_update_key)
+function update_state_values(state::State, known_boxes, new_boxes::Set{Ortho}, box_update_key)
     increment = filter(!(x -> x in known_boxes), new_boxes)
     lhs_center_to_ortho = mergewith(
         union,
@@ -105,7 +107,66 @@ function ingest_word(state::State, next::Dict{String,Set{String}}, prev::Dict{St
     update_state_values(state, known_boxes, new_boxes, dims)
 end
 
-function increase_minor_axis_size(phrases :: Array{Set{String}}, state :: State, current :: Ortho)
+function bump_last_dim(dims)
+    ans = collect(dims)
+    ans[end] += 1
+    Tuple(ans)
+end
+
+"make sure resulting phrases are in phrases"
+function phrase_filter(phrases, lhs_data, rhs_data)
+
+end
+
+function combine(
+    phrases,
+    lhs_center_to_ortho::Dict{Array{String},Set{Ortho}},
+    rhs_center_to_ortho::Dict{Array{String},Set{Ortho}},
+    current::Ortho,
+)::Array{Ortho}
+    left_winners = map(
+        x -> combine_winners(current, x),
+        filter(
+            x -> phrase_filter(phrases, current.data, x.data),
+            collect(get(lhs_center_to_ortho, current.rhs_center, Set())),
+        ),
+    )
+
+    right_winners = map(
+        x -> combine_winners(x, current),
+        filter(
+            x -> phrase_filter(phrases, x.data, current.data),
+            collect(get(rhs_center_to_ortho, current.lhs_center, Set())),
+        ),
+    )
+
+    vcat(left_winners..., right_winners...)
+end
+
+# TODO skip making rotations if the original is already there (they will be filtered)
+function combine_in_axis(phrases, lhs_center_to_ortho, rhs_center_to_ortho, current) :: Set{Ortho}
+    Set(vcat(map(rotations, combine(phrases, lhs_center_to_ortho, rhs_center_to_ortho, current))...))
+end
+
+function reconstitute_from_data(diagonals, data)
+    dims = size(data)
+    minor_dim = dims[length(dims)]
+    Ortho(data, data[.., 1:minor_dim-1], data[.., 2:minor_dim], diagonals)
+end
+
+# TODO consider permutedimsarray and array views generally
+function rotate_data(d::Array)
+    dimensionality = length(size(d))
+    transforms = map(x -> [dimensionality, x], range(1, stop = dimensionality - 1))
+    map(x -> permutedims(d, x), transforms)
+end
+
+function rotations(o::Ortho)
+    datas = rotate_data(o.data)
+    vcat(o, map(x -> reconstitute_from_data(o.diagonals, x), datas)...)
+end
+
+function increase_minor_axis_size(phrases, state::State, current::Ortho)
     dims = size(current.data)
     known_boxes = get(state.boxes, dims, Set())
     new_boxes = combine_in_axis(phrases, state.lhs_center_to_ortho, state.rhs_center_to_ortho, current)
@@ -127,4 +188,6 @@ for word in vocab
     state = ingest_word(state, all_nexts, all_prevs, word)
 end
 
-state
+for ortho in collect(state.boxes[(2, 2)])
+    state = increase_minor_axis_size(all_phrases, state, ortho)
+end
