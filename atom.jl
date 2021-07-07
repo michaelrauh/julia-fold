@@ -1,4 +1,5 @@
 using EllipsisNotation
+using Traceur
 
 struct Ortho
     data::Array{String}
@@ -100,7 +101,7 @@ function update_state_values(state::State, known_boxes, new_boxes::Set{Ortho}, b
     State(lhs_center_to_ortho, rhs_center_to_ortho, boxes, increment)
 end
 
-function ingest_word(state::State, next::Dict{String,Set{String}}, prev::Dict{String,Set{String}}, word::String)::State
+@trace function ingest_word(state::State, next::Dict{String,Set{String}}, prev::Dict{String,Set{String}}, word::String)::State
     dims = (2, 2)
     known_boxes = get(state.boxes, dims, Set())
     new_boxes = make_atom(word, next, prev)
@@ -113,9 +114,30 @@ function bump_last_dim(dims)
     Tuple(ans)
 end
 
-"make sure resulting phrases are in phrases"
-function phrase_filter(phrases, lhs_data, rhs_data)
+function get_phrases(arr)
+    dims = size(arr)
+    volume = reduce(*, dims)
+    phrase_length = dims[end]
+    remaining_volume = Integer(volume // phrase_length)
+    A = reshape(arr, (remaining_volume, phrase_length))
+    map(x -> A[x,..], range(1, stop=remaining_volume))
+end
 
+function get_words(arr)
+    map(last, get_phrases(A))
+end
+
+function get_desired_phrases(l, r)
+    map(vcat, get_phrases(l), get_words(r))
+end
+
+function phrase_filter(phrases, l, r)
+    for phrase in get_desired_phrases(l, r)
+        if !(phrase in phrases)
+            return false
+        end
+        return true
+    end
 end
 
 function combine(
