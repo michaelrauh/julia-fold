@@ -140,6 +140,13 @@ function phrase_filter(phrases, l, r)
     end
 end
 
+function combine_winners(l, r)
+    # TODO remove repeated calls
+    data = reshape(cat(get_desired_phrases(l.data, r.data)..., dims=(2)), bump_last_dim(size(l.data)))
+    diagonals = vcat([first(l.diagonals)], map(union, l.diagonals[2:end], r.diagonals[1:end-1]), [last(r.diagonals)])
+    reconstitute_from_data(diagonals, data)
+end
+
 function combine(
     phrases,
     lhs_center_to_ortho::Dict{Array{String},Set{Ortho}},
