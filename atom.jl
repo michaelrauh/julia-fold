@@ -85,8 +85,7 @@ function tails(sentence)
     end
 end
 
-function update_state_values(state::State, known_boxes, new_boxes::Set{Ortho}, box_update_key)
-    increment = filter(!(x -> x in known_boxes), new_boxes)
+function update_state_values(state::State, increment, box_update_key)
     lhs_center_to_ortho = mergewith(
         union,
         state.lhs_center_to_ortho,
@@ -105,7 +104,8 @@ end
     dims = (2, 2)
     known_boxes = get(state.boxes, dims, Set())
     new_boxes = make_atom(word, next, prev)
-    update_state_values(state, known_boxes, new_boxes, dims)
+    increment = filter(!(x -> x in known_boxes), new_boxes)
+    update_state_values(state, increment, dims)
 end
 
 function bump_last_dim(dims)
@@ -147,7 +147,7 @@ function combine_winners(l, r)
     reconstitute_from_data(diagonals, data)
 end
 
-function combine(
+function combine_in_axis(
     phrases,
     lhs_center_to_ortho::Dict{Array{String},Set{Ortho}},
     rhs_center_to_ortho::Dict{Array{String},Set{Ortho}},
@@ -172,11 +172,6 @@ function combine(
     vcat(left_winners..., right_winners...)
 end
 
-# TODO skip making rotations if the original is already there (they will be filtered)
-function combine_in_axis(phrases, lhs_center_to_ortho, rhs_center_to_ortho, current) :: Set{Ortho}
-    Set(vcat(map(rotations, combine(phrases, lhs_center_to_ortho, rhs_center_to_ortho, current))...))
-end
-
 function reconstitute_from_data(diagonals, data)
     dims = size(data)
     minor_dim = dims[length(dims)]
@@ -196,27 +191,128 @@ function rotations(o::Ortho)
 end
 
 function increase_minor_axis_size(phrases, state::State, current::Ortho)
-    dims = size(current.data)
-    known_boxes = get(state.boxes, dims, Set())
+    next_dims = bump_last_dim(size(current.data))
     new_boxes = combine_in_axis(phrases, state.lhs_center_to_ortho, state.rhs_center_to_ortho, current)
-    update_state_values(state, known_boxes, new_boxes, bump_last_dim(dims))
+    filter_rotate_and_increment(next_dims, new_boxes, state)
+end
+
+function increase_dimensionality(nexts, prevs, state, current)
+    dims = size(current.data)
+    next_dims = increase_dims_size(dims)
+    new_boxes = combine_across_axis(nexts, prevs, get(state.boxes, dims, Set()), current)
+    filter_rotate_and_increment(next_dims, new_boxes, state)
+end
+
+function filter_rotate_and_increment(dims, new_boxes, state)
+    known_boxes = get(state.boxes, dims, Set())
+    filtered_boxes = filter(!(x -> x in known_boxes), new_boxes)
+    increment = Set(vcat(map(rotations, filtered_boxes)...))
+    update_state_values(state, increment, dims)
 end
 
 function empty_state()
     State(Dict(), Dict(), Dict(), Set())
 end
 
-file_arrays = read_file_to_arrays("example1.txt")
-all_prevs = get_all(prevs, file_arrays)
-all_nexts = get_all(nexts, file_arrays)
-all_phrases = make_phrases(file_arrays)
-vocab = vcat(file_arrays...) |> sort |> unique
-
-state = empty_state()
-for word in vocab
-    state = ingest_word(state, all_nexts, all_prevs, word)
+function increase_dims_size(dims)
+    Tuple(vcat(collect(dims), [2]))
 end
 
-for ortho in collect(state.boxes[(2, 2)])
-    state = increase_minor_axis_size(all_phrases, state, ortho)
+function next_filter(nexts, l, r)
+    for (left, right) in zip(collect(l.data), collect(r.data))
+        if !(right in get(nexts, left, Set()))
+            return false
+        end
+    end
+    return true
 end
+
+# TODO consider using andmap
+function diagonal_filter(l, r)
+    for (left, right) in zip(l[2:end], r[1:end-1])
+        if !(isdisjoint(left, right))
+            return false
+        end
+    end
+    return true
+end
+
+# TODO dedup
+function combine_across_axis(nexts, prevs, candidates, current)
+    next_candidates = filter(x -> next_filter(nexts, current, x), candidates)
+    prev_candidates = filter(x -> next_filter(prevs, current, x), candidates)
+
+    selected_next_candidates = filter(x -> diagonal_filter(current.diagonals, x.diagonals), next_candidates)
+    selected_prev_candidates = filter(x -> diagonal_filter(x.diagonals, current.diagonals), prev_candidates)
+
+    next_winners = map(x -> combine_winners(current, x), collect(selected_next_candidates))
+    prev_winners = map(x -> combine_winners(x, current), collect(selected_prev_candidates))
+
+    vcat(next_winners..., prev_winners...)
+end
+
+function andmap(f, xs)
+    for x in xs
+        if !f(x)
+            return false
+        end
+        return true
+    end
+end
+
+function get_all_prevs(x)
+    get_all(prevs, x)
+end
+
+function get_all_nexts(x)
+    get_all(nexts, x)
+end
+
+function get_vocab(x)
+    vcat(x...) |> sort |> unique
+end
+
+function base_dimension(dims)
+    for dim in collect(dims)
+        if dim != 2
+            return false
+        end
+    end
+    return true
+end
+
+function go(filename)
+    file_arrays = read_file_to_arrays("example1.txt")
+    all_prevs = get_all_prevs(file_arrays)
+    all_nexts = get_all_nexts(file_arrays)
+    all_phrases = make_phrases(file_arrays)
+    vocab = get_vocab(file_arrays)
+
+    state = empty_state()
+    for word in vocab
+        state = sift(ingest_word(state, all_nexts, all_prevs, word), all_nexts, all_prevs)
+    end
+    state
+end
+
+function decrement(state)
+    State(state.lhs_center_to_ortho, state.rhs_center_to_ortho, state.boxes, Set(collect(state.increment)[2:end]))
+end
+
+# TODO consider using a work queue instead of recursion
+function sift(state, all_nexts, all_prevs)
+    if isempty(state.increment)
+        return state
+    end
+
+    current = first(state.increment)
+    if base_dimension(size(current.data))
+        state = sift(increase_dimensionality(all_nexts, all_prevs, state, current), all_nexts, all_prevs)
+    end
+
+    state = sift(increase_minor_axis_size(all_phrases, state, current), all_nexts, all_prevs)
+    sift(decrement(state), all_nexts, all_prevs)
+end
+
+# TODO implement state merging
+go("example1.txt")
