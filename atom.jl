@@ -282,7 +282,7 @@ function base_dimension(dims)
 end
 
 function go(filename)
-    file_arrays = read_file_to_arrays("example1.txt")
+    file_arrays = read_file_to_arrays(filename)
     all_prevs = get_all_prevs(file_arrays)
     all_nexts = get_all_nexts(file_arrays)
     all_phrases = make_phrases(file_arrays)
@@ -315,4 +315,5 @@ function sift(state, all_nexts, all_prevs)
 end
 
 # TODO implement state merging
-go("example1.txt")
+s1 = go("example1.txt")
+s1 = go("example2.txt")
