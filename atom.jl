@@ -100,7 +100,7 @@ function update_state_values(state::State, increment, box_update_key)
     State(lhs_center_to_ortho, rhs_center_to_ortho, boxes, increment)
 end
 
-@trace function ingest_word(state::State, next::Dict{String,Set{String}}, prev::Dict{String,Set{String}}, word::String)::State
+function ingest_word(state::State, next::Dict{String,Set{String}}, prev::Dict{String,Set{String}}, word::String)::State
     dims = (2, 2)
     known_boxes = get(state.boxes, dims, Set())
     new_boxes = make_atom(word, next, prev)
@@ -124,7 +124,7 @@ function get_phrases(arr)
 end
 
 function get_words(arr)
-    map(last, get_phrases(A))
+    map(last, get_phrases(arr))
 end
 
 function get_desired_phrases(l, r)
@@ -281,16 +281,18 @@ function base_dimension(dims)
     return true
 end
 
-function go(filename)
+function make_starting_config(filename)
     file_arrays = read_file_to_arrays(filename)
     all_prevs = get_all_prevs(file_arrays)
     all_nexts = get_all_nexts(file_arrays)
     all_phrases = make_phrases(file_arrays)
     vocab = get_vocab(file_arrays)
+    all_prevs, all_nexts, all_phrases, vocab, empty_state()
+end
 
-    state = empty_state()
+function go(all_prevs, all_nexts, all_phrases, vocab, state)
     for word in vocab
-        state = sift(ingest_word(state, all_nexts, all_prevs, word), all_nexts, all_prevs)
+        state = sift(ingest_word(state, all_nexts, all_prevs, word), all_nexts, all_prevs, all_phrases)
     end
     state
 end
@@ -300,20 +302,42 @@ function decrement(state)
 end
 
 # TODO consider using a work queue instead of recursion
-function sift(state, all_nexts, all_prevs)
+function sift(state, all_nexts, all_prevs, all_phrases)
     if isempty(state.increment)
         return state
     end
 
     current = first(state.increment)
     if base_dimension(size(current.data))
-        state = sift(increase_dimensionality(all_nexts, all_prevs, state, current), all_nexts, all_prevs)
+        state = sift(increase_dimensionality(all_nexts, all_prevs, state, current), all_nexts, all_prevs, all_phrases)
     end
 
-    state = sift(increase_minor_axis_size(all_phrases, state, current), all_nexts, all_prevs)
-    sift(decrement(state), all_nexts, all_prevs)
+    state = sift(increase_minor_axis_size(all_phrases, state, current), all_nexts, all_prevs, all_phrases)
+    sift(decrement(state), all_nexts, all_prevs, all_phrases)
 end
 
-# TODO implement state merging
-s1 = go("example1.txt")
-s1 = go("example2.txt")
+function merge_state(s1, s2)
+    State(
+    mergewith(union, s1.lhs_center_to_ortho, s2.lhs_center_to_ortho),
+    mergewith(union, s1.rhs_center_to_ortho, s2.rhs_center_to_ortho),
+    mergewith(union, s1.boxes, s2.boxes),
+    Set())
+end
+
+function merge_starting_config(all_prevs1, all_nexts1, all_phrases1, vocab1, all_prevs2, all_nexts2, all_phrases2, vocab2)
+    return mergewith(union, all_prevs1, all_prevs2),
+    mergewith(union, all_nexts1, all_nexts2),
+    union(all_phrases1, all_phrases2),
+    get_vocab(vcat(vocab1..., vocab2...))
+end
+
+function merge_run(f1, f2)
+    all_prevs1, all_nexts1, all_phrases1, vocab1, state1 = make_starting_config(f1)
+    all_prevs2, all_nexts2, all_phrases2, vocab2, state2 = make_starting_config(f2)
+
+    state = merge_state(go(all_prevs1, all_nexts1, all_phrases1, vocab1, state1), go(all_prevs2, all_nexts2, all_phrases2, vocab2, state2))
+    all_prevs3, all_nexts3, all_phrases3, vocab3 = merge_starting_config(all_prevs1, all_nexts1, all_phrases1, vocab1, all_prevs2, all_nexts2, all_phrases2, vocab2)
+    go(all_prevs3, all_nexts3, all_phrases3, vocab3, state)
+end
+
+println(merge_run("example1.txt", "example2.txt").boxes)
