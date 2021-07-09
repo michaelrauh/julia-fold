@@ -8,6 +8,14 @@ struct Ortho
     diagonals::Array{Set{String}}
 end
 
+function Base.hash(a::Ortho, h::UInt)
+    Base.hash((a.data, a.lhs_center, a.rhs_center,a.diagonals), h)
+end
+
+function Base.:(==)(a::Ortho, b::Ortho)
+    a.data == b.data && a.lhs_center == b.lhs_center && a.rhs_center == b.rhs_center && a.diagonals == b.diagonals
+end
+
 struct State
     lhs_center_to_ortho::Dict{Array{String},Set{Ortho}}
     rhs_center_to_ortho::Dict{Array{String},Set{Ortho}}
@@ -340,4 +348,4 @@ function merge_run(f1, f2)
     go(all_prevs3, all_nexts3, all_phrases3, vocab3, state)
 end
 
-println(merge_run("example1.txt", "example2.txt").boxes)
+# merge_run("example1.txt", "example2.txt").boxes
