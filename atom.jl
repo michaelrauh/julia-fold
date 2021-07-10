@@ -1,4 +1,3 @@
-include("types.jl")
 include("util.jl")
 
 function make_ortho(a::String, b::String, c::String, d::String)::Ortho

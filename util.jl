@@ -1,5 +1,7 @@
 using EllipsisNotation
 using Traceur
+include("types.jl")
+
 
 function filter_rotate_and_increment(dims, new_boxes, state)
     known_boxes = get(state.boxes, dims, Set())
