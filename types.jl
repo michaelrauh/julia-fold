@@ -19,3 +19,10 @@ struct State
     boxes::Dict{Any,Set{Ortho}}
     increment::Set{Ortho}
 end
+
+struct Config
+    prevs
+    nexts
+    phrases
+    vocab
+end

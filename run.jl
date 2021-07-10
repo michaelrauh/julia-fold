@@ -74,12 +74,12 @@ function make_starting_config(filename)
     all_nexts = get_all_nexts(file_arrays)
     all_phrases = make_phrases(file_arrays)
     vocab = get_vocab(file_arrays)
-    all_prevs, all_nexts, all_phrases, vocab, empty_state()
+    Config(all_prevs, all_nexts, all_phrases, vocab)
 end
 
-function go(all_prevs, all_nexts, all_phrases, vocab, state)
-    for word in vocab
-        state = sift(ingest_word(state, all_nexts, all_prevs, word), all_nexts, all_prevs, all_phrases)
+function go(config, state)
+    for word in config.vocab
+        state = sift(ingest_word(state, config.nexts, config.prevs, word), config.nexts, config.prevs, config.phrases)
     end
     state
 end
