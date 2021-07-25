@@ -11,26 +11,6 @@ function read_file_to_arrays(filename::String)::Vector{Vector{String}}
     filter(x -> !isempty(x), ans)
 end
 
-function get_all(f::Function, l::Vector{Vector{String}})::Dict{String,Set{String}}
-    mergewith(union, map(f, l)...)
-end
-
-function if_longer_two_then(f::Function, l::Vector{String})
-    if length(l) < 2
-        Dict()
-    else
-        f(l)
-    end
-end
-
-function prevs(l::Vector{String})::Dict{String,Set{String}}
-    if_longer_two_then(x -> mergewith(union, Dict(x[2] => Set([first(x)])), prevs(x[2:end])), l)
-end
-
-function nexts(l::Vector{String})::Dict{String,Set{String}}
-    if_longer_two_then(x -> mergewith(union, Dict(first(x) => Set([x[2]])), nexts(x[2:end])), l)
-end
-
 function make_phrases(sentences_list)
     union(map(tails, sentences_list)...)
 end
@@ -48,11 +28,26 @@ function empty_state()
 end
 
 function get_all_prevs(x)
-    get_all(prevs, x)
+    function prevs(l::Vector{String})::Dict{String,Set{String}}
+        if length(l) < 2
+            Dict()
+        else
+            mergewith(union, Dict(l[2] => Set([first(l)])), prevs(l[2:end]))
+        end
+    end
+    mergewith(union, map(prevs, x)...)
 end
 
 function get_all_nexts(x)
-    get_all(nexts, x)
+    function nexts(l::Vector{String})::Dict{String,Set{String}}
+        if length(l) < 2
+            Dict()
+        else
+            mergewith(union, Dict(first(l) => Set([l[2]])), nexts(l[2:end]))
+        end
+    end
+
+    mergewith(union, map(nexts, x)...)
 end
 
 function get_vocab(x)
