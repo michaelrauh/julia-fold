@@ -38,8 +38,8 @@ function combine_across_axis(nexts, prevs, candidates, current)
     selected_next_candidates = filter(x -> diagonal_filter(current.diagonals, x.diagonals), next_candidates)
     selected_prev_candidates = filter(x -> diagonal_filter(x.diagonals, current.diagonals), prev_candidates)
 
-    next_winners = map(x -> combine_winners(current, x), collect(selected_next_candidates))
-    prev_winners = map(x -> combine_winners(x, current), collect(selected_prev_candidates))
+    next_winners = map(x -> combine_cross_winners(current, x), collect(selected_next_candidates))
+    prev_winners = map(x -> combine_cross_winners(x, current), collect(selected_prev_candidates))
 
     vcat(next_winners..., prev_winners...)
 end

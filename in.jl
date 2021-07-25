@@ -12,7 +12,7 @@ function get_phrases(arr)
     phrase_length = dims[end]
     remaining_volume = Integer(volume // phrase_length)
     A = reshape(arr, (remaining_volume, phrase_length))
-    map(x -> A[x,..], range(1, stop=remaining_volume))
+    map(x -> A[x, ..], range(1, stop = remaining_volume))
 end
 
 function get_words(arr)
@@ -24,7 +24,8 @@ function get_desired_phrases(l, r)
 end
 
 function phrase_filter(phrases, l, r)
-    for phrase in get_desired_phrases(l, r)
+    desired = get_desired_phrases(l, r)
+    for phrase in desired
         if !(phrase in phrases)
             return false
         end
@@ -38,19 +39,20 @@ function combine_in_axis(
     rhs_center_to_ortho::Dict{Array{String},Set{Ortho}},
     current::Ortho,
 )::Array{Ortho}
+    left_candidates = collect(get(lhs_center_to_ortho, current.rhs_center, Set()))
     left_winners = map(
         x -> combine_winners(current, x),
         filter(
             x -> phrase_filter(phrases, current.data, x.data),
-            collect(get(lhs_center_to_ortho, current.rhs_center, Set())),
+            left_candidates,
         ),
     )
-
+    right_candidates = collect(get(rhs_center_to_ortho, current.lhs_center, Set()))
     right_winners = map(
         x -> combine_winners(x, current),
         filter(
             x -> phrase_filter(phrases, x.data, current.data),
-            collect(get(rhs_center_to_ortho, current.lhs_center, Set())),
+            right_candidates,
         ),
     )
 

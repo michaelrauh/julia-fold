@@ -11,16 +11,16 @@ include("./atom.jl")
     Ortho(["a" "c"; "b" "d"], ["a", "b"], ["c", "d"], Set{String}[Set(["a"]), Set(["c", "b"]), Set(["d"])]),
 ])
 
-s = ingest_word(
-    State(Dict(), Dict(), Dict(), Set()),
-    Dict("a" => Set(["b", "c"]), "b" => Set(["d"]), "c" => Set(["d"])),
-    Dict("b" => Set(["a"]), "c" => Set(["a"]), "d" => Set(["b", "c"])),
-    "d",
-)
-
-ingest_word(
-    s,
-    Dict("a" => Set(["b", "c"]), "b" => Set(["d"]), "c" => Set(["d"])),
-    Dict("b" => Set(["a"]), "c" => Set(["a"]), "d" => Set(["b", "c"])),
-    "d",
+@test isempty(
+    ingest_word(
+        ingest_word(
+            State(Dict(), Dict(), Dict(), Set()),
+            Dict("a" => Set(["b", "c"]), "b" => Set(["d"]), "c" => Set(["d"])),
+            Dict("b" => Set(["a"]), "c" => Set(["a"]), "d" => Set(["b", "c"])),
+            "d",
+        ),
+        Dict("a" => Set(["b", "c"]), "b" => Set(["d"]), "c" => Set(["d"])),
+        Dict("b" => Set(["a"]), "c" => Set(["a"]), "d" => Set(["b", "c"])),
+        "d",
+    ).increment,
 )
